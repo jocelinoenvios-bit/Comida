@@ -6,6 +6,15 @@ const prisma = new PrismaClient();
 const img = (seed: string, w = 800, h = 600) =>
   `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`;
 
+function slugify(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 const DEFAULT_HOURS = JSON.stringify({
   mon: [["11:00", "23:00"]],
   tue: [["11:00", "23:00"]],
@@ -16,6 +25,9 @@ const DEFAULT_HOURS = JSON.stringify({
   sun: [["17:00", "22:30"]],
 });
 
+// Este seed é executado a cada deploy (build command na Vercel), então precisa ser
+// idempotente: rodar de novo nunca deve duplicar ou falhar por causa de dados já
+// existentes. Por isso usamos upsert com IDs determinísticos em vez de create() puro.
 async function main() {
   console.log("Seeding Boraqui — Varjota/CE...");
 
@@ -358,21 +370,31 @@ async function main() {
     });
 
     for (const slug of est.categorySlugs) {
-      await prisma.establishmentCategory
-        .create({ data: { establishmentId: establishment.id, categoryId: categories[slug].id } })
-        .catch(() => {});
+      await prisma.establishmentCategory.upsert({
+        where: { establishmentId_categoryId: { establishmentId: establishment.id, categoryId: categories[slug].id } },
+        update: {},
+        create: { establishmentId: establishment.id, categoryId: categories[slug].id },
+      });
     }
 
     const sectionCache: Record<string, { id: string }> = {};
+    let sectionOrder = 0;
     for (const p of est.products) {
       if (!sectionCache[p.section]) {
-        sectionCache[p.section] = await prisma.menuSection.create({
-          data: { establishmentId: establishment.id, name: p.section, order: Object.keys(sectionCache).length },
+        const sectionId = `${establishment.id}-section-${slugify(p.section)}`;
+        sectionCache[p.section] = await prisma.menuSection.upsert({
+          where: { id: sectionId },
+          update: {},
+          create: { id: sectionId, establishmentId: establishment.id, name: p.section, order: sectionOrder++ },
         });
       }
       const primaryCategoryId = categories[est.categorySlugs[0]]?.id;
-      await prisma.product.create({
-        data: {
+      const productId = `${establishment.id}-product-${slugify(p.name)}`;
+      await prisma.product.upsert({
+        where: { id: productId },
+        update: {},
+        create: {
+          id: productId,
           establishmentId: establishment.id,
           menuSectionId: sectionCache[p.section].id,
           categoryId: primaryCategoryId,
@@ -389,23 +411,26 @@ async function main() {
 
     if (est.additions) {
       for (const a of est.additions) {
-        await prisma.additionItem.create({
-          data: { establishmentId: establishment.id, name: a.name, price: a.price },
+        const additionId = `${establishment.id}-addition-${slugify(a.name)}`;
+        await prisma.additionItem.upsert({
+          where: { id: additionId },
+          update: {},
+          create: { id: additionId, establishmentId: establishment.id, name: a.name, price: a.price },
         });
       }
     }
 
-    await prisma.coupon
-      .create({
-        data: {
-          establishmentId: establishment.id,
-          code: `${est.slug.split("-")[0].toUpperCase()}10`,
-          type: "PERCENT",
-          value: 10,
-          minOrderValue: 20,
-        },
-      })
-      .catch(() => {});
+    await prisma.coupon.upsert({
+      where: { code: `${est.slug.split("-")[0].toUpperCase()}10` },
+      update: {},
+      create: {
+        establishmentId: establishment.id,
+        code: `${est.slug.split("-")[0].toUpperCase()}10`,
+        type: "PERCENT",
+        value: 10,
+        minOrderValue: 20,
+      },
+    });
   }
 
   // Suspende um estabelecimento de exemplo para demonstrar o painel admin
@@ -414,16 +439,21 @@ async function main() {
     data: { status: "SUSPENDED" },
   });
 
-  await prisma.favorite
-    .create({ data: { userId: customer.id, establishmentId: (await prisma.establishment.findUniqueOrThrow({ where: { slug: "point-do-burguer" } })).id } })
-    .catch(() => {});
-
   const burguer = await prisma.establishment.findUniqueOrThrow({ where: { slug: "point-do-burguer" } });
-  const xbacon = await prisma.product.findFirstOrThrow({ where: { establishmentId: burguer.id, name: "X-Bacon" } });
+
+  await prisma.favorite.upsert({
+    where: { userId_establishmentId: { userId: customer.id, establishmentId: burguer.id } },
+    update: {},
+    create: { userId: customer.id, establishmentId: burguer.id },
+  });
+
+  const xbacon = await prisma.product.findUniqueOrThrow({ where: { id: `${burguer.id}-product-x-bacon` } });
   const address = await prisma.address.findUniqueOrThrow({ where: { id: "seed-address-customer" } });
 
-  const order = await prisma.order.create({
-    data: {
+  const order = await prisma.order.upsert({
+    where: { code: "BQ-0001" },
+    update: {},
+    create: {
       code: "BQ-0001",
       customerId: customer.id,
       establishmentId: burguer.id,
@@ -439,8 +469,10 @@ async function main() {
     },
   });
 
-  await prisma.review.create({
-    data: {
+  await prisma.review.upsert({
+    where: { orderId: order.id },
+    update: {},
+    create: {
       establishmentId: burguer.id,
       customerId: customer.id,
       orderId: order.id,
@@ -452,19 +484,40 @@ async function main() {
   });
 
   // ---------- Banners ----------
-  await prisma.banner.createMany({
-    data: [
-      { cityId: city.id, title: "Frete grátis nos combos até 20h", imageUrl: img("banner-frete-gratis", 1600, 500), order: 0 },
-      { cityId: city.id, title: "Semana da Pizza — até 15% OFF", imageUrl: img("banner-pizza", 1600, 500), order: 1 },
-      { cityId: city.id, title: "Novos estabelecimentos toda semana", imageUrl: img("banner-novidades", 1600, 500), order: 2 },
-    ],
-  });
+  const banners = [
+    { id: "seed-banner-frete-gratis", title: "Frete grátis nos combos até 20h", imageUrl: img("banner-frete-gratis", 1600, 500), order: 0 },
+    { id: "seed-banner-pizza", title: "Semana da Pizza — até 15% OFF", imageUrl: img("banner-pizza", 1600, 500), order: 1 },
+    { id: "seed-banner-novidades", title: "Novos estabelecimentos toda semana", imageUrl: img("banner-novidades", 1600, 500), order: 2 },
+  ];
+  for (const b of banners) {
+    await prisma.banner.upsert({
+      where: { id: b.id },
+      update: {},
+      create: { id: b.id, cityId: city.id, title: b.title, imageUrl: b.imageUrl, order: b.order },
+    });
+  }
 
-  await prisma.notification.createMany({
-    data: [
-      { userId: customer.id, title: "Pedido confirmado!", body: "Seu pedido no Point do Burguer foi confirmado.", type: "PEDIDO_CONFIRMADO" },
-      { userId: null, title: "Chegou o Boraqui em Varjota!", body: "Agora você encontra todos os deliveries da cidade em um só lugar.", type: "NOVO_ESTABELECIMENTO" },
-    ],
+  await prisma.notification.upsert({
+    where: { id: "seed-notification-pedido-confirmado" },
+    update: {},
+    create: {
+      id: "seed-notification-pedido-confirmado",
+      userId: customer.id,
+      title: "Pedido confirmado!",
+      body: "Seu pedido no Point do Burguer foi confirmado.",
+      type: "PEDIDO_CONFIRMADO",
+    },
+  });
+  await prisma.notification.upsert({
+    where: { id: "seed-notification-boas-vindas" },
+    update: {},
+    create: {
+      id: "seed-notification-boas-vindas",
+      userId: null,
+      title: "Chegou o Boraqui em Varjota!",
+      body: "Agora você encontra todos os deliveries da cidade em um só lugar.",
+      type: "NOVO_ESTABELECIMENTO",
+    },
   });
 
   console.log("Seed concluído.");

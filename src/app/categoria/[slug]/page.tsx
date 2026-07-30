@@ -5,9 +5,10 @@ import { EstablishmentCard } from "@/components/establishment-card";
 import { CategoryChip } from "@/components/category-chip";
 import { HScroll } from "@/components/section";
 
-export async function generateStaticParams() {
-  return CATEGORIES_SEED.map((c) => ({ slug: c.slug }));
-}
+// Sem generateStaticParams de propósito: a página depende do banco (cidade de
+// lançamento, estabelecimentos), então precisa ser renderizada por request, não
+// pré-gerada no build — evita quebrar o build quando o banco de produção ainda
+// está vazio (antes do seed rodar) e mantém tudo atualizado sem precisar de rebuild.
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

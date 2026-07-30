@@ -12,6 +12,12 @@ import { EstablishmentCard } from "@/components/establishment-card";
 import { BannerCarousel } from "@/components/banner-carousel";
 import { Ticket } from "lucide-react";
 
+// Sem isso, o Next tenta pré-renderizar a home no build (dados do Postgres não são
+// detectados como "dinâmicos" automaticamente como com fetch()) — quebra em builds
+// contra um banco recém-migrado e ainda vazio, e não reflete banners/estabelecimentos
+// novos sem um rebuild.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const city = await getLaunchCity();
 
