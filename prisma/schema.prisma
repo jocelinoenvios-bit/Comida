@@ -1,13 +1,14 @@
 // Boraqui — schema desenhado para escalar de 1 para centenas de cidades.
-// SQLite não suporta enum nativamente, então "enums" são strings validadas
-// em app-level (ver src/lib/constants.ts) — troca fácil para Postgres no futuro.
+// "Enums" são strings validadas em app-level (ver src/lib/constants.ts) em vez de
+// enum nativo do Postgres — mantém o schema simples e evita migração de tipo se um
+// valor novo precisar ser adicionado sem downtime.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
