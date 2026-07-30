@@ -11,8 +11,7 @@ Lançamento: **Varjota, CE**. Arquitetura pronta para expandir a centenas de cid
 
 - **Next.js 16** (App Router, React 19, TypeScript) — um único app cobrindo cliente, comerciante e
   administrador, além de PWA instalável em Android/iPhone/desktop.
-- **Prisma + SQLite** para desenvolvimento local (schema portátil para Postgres em produção — troque
-  só o `provider`/`DATABASE_URL`).
+- **Prisma + PostgreSQL** (mesmo banco em dev e produção — só troca a `DATABASE_URL`).
 - **NextAuth v5** — login com Google e login por telefone (OTP simulado no MVP).
 - **Tailwind CSS v4** com paleta de marca (laranja/azul-escuro/branco/cinza-claro).
 - **Zustand** para o carrinho (persistido em `localStorage`, por estabelecimento).
@@ -32,12 +31,16 @@ Lançamento: **Varjota, CE**. Arquitetura pronta para expandir a centenas de cid
 ## Rodando localmente
 
 ```bash
+docker compose up -d db     # sobe um Postgres local (veja docker-compose.yml)
 npm install
 cp .env.example .env        # ajuste AUTH_GOOGLE_ID/SECRET se for testar login Google
-npx prisma migrate dev      # cria o SQLite local e aplica o schema
+npx prisma migrate dev      # aplica o schema no Postgres local
 npm run db:seed             # popula Varjota/CE com estabelecimentos, produtos, planos etc.
 npm run dev
 ```
+
+Não tem Docker à mão? Aponte `DATABASE_URL` no `.env` para qualquer Postgres acessível
+(local, Neon, Supabase...) — o resto do fluxo é igual.
 
 Abra http://localhost:3000.
 
@@ -83,10 +86,44 @@ Gratuito (até 20 produtos) → Bronze (produtos ilimitados) → Prata (destaque
 → Ouro (primeiras posições, banner principal, notificações, relatórios completos). Editável em
 `/admin/planos`; o limite de produtos do plano é aplicado na hora de cadastrar itens no cardápio.
 
+## Deploy em produção
+
+O app foi validado rodando build + seed + fluxo completo contra um Postgres real antes de qualquer
+deploy. Passo a passo recomendado (Vercel, mas qualquer host Node.js serve):
+
+1. **Banco de dados**: crie um Postgres gerenciado — [Neon](https://neon.tech) ou
+   [Supabase](https://supabase.com) têm free tier e funcionam bem com serverless (connection pooling
+   já embutido). A Vercel Postgres (Neon por baixo) também funciona direto pela integração da própria
+   Vercel. Copie a *connection string*.
+2. **Variáveis de ambiente** no seu host (nunca commitar `.env`):
+
+   | Variável | Valor |
+   |---|---|
+   | `DATABASE_URL` | connection string do Postgres de produção (use a URL "pooled", se o provedor oferecer) |
+   | `AUTH_SECRET` | gerar com `openssl rand -base64 32` — um valor só para produção, diferente do dev |
+   | `NEXTAUTH_URL` | URL pública do app, ex: `https://boraqui.com.br` |
+   | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | credenciais OAuth do Google Cloud Console, com redirect URI `{NEXTAUTH_URL}/api/auth/callback/google` |
+   | `BLOB_READ_WRITE_TOKEN` | token do [Vercel Blob](https://vercel.com/dashboard/stores) — obrigatório em produção para upload de imagens (ver item 6) |
+
+3. **Migrações**: rode `npm run db:migrate:deploy` (`prisma migrate deploy`) contra o banco de
+   produção antes de servir tráfego novo — na Vercel, a forma mais simples é sobrescrever o *Build
+   Command* do projeto para `npm run db:migrate:deploy && next build`. Isso aplica as migrações
+   pendentes a cada deploy, sem interatividade.
+4. **`postinstall`** já roda `prisma generate` automaticamente após `npm install`, então não precisa
+   de passo manual para o client ficar em sincronia com o schema.
+5. **Seed**: rode `npm run db:seed` uma única vez contra o banco de produção se quiser começar com os
+   dados de demonstração de Varjota/CE — normalmente você vai preferir cadastrar cidades/estabelecimentos
+   reais pelo painel admin em vez de usar o seed em produção.
+6. **Imagens**: o upload (logo, capa, produtos, banners) usa [Vercel Blob](https://vercel.com/dashboard/stores)
+   quando `BLOB_READ_WRITE_TOKEN` está configurado — é o caminho de produção. Sem o token, o app grava em
+   `storage/uploads` (só funciona em servidor com filesystem persistente, não em serverless/Vercel sem o
+   token). `next.config.ts` libera qualquer host `https` para `next/image`, já que comerciantes também
+   podem colar uma URL de imagem externa em vez de fazer upload.
+
 ## Limitações conhecidas do MVP (próximos passos)
 
-- **Upload de imagens**: comerciantes colam URLs de imagem; falta um pipeline de upload
-  (S3/Cloudinary) com recorte/compressão.
+- **Upload de imagens** funciona (Vercel Blob em produção, disco local em dev), mas ainda sem
+  recorte/compressão automática — vale adicionar antes de escalar para muitos comerciantes.
 - **OTP por telefone** é simulado (`0000`); falta integração com um provedor de SMS.
 - **Pagamento** continua manual via WhatsApp (PIX copia-e-cola, dinheiro ou cartão na entrega),
   como pedido no briefing — pagamento online fica para uma fase futura.
@@ -100,9 +137,10 @@ Gratuito (até 20 produtos) → Bronze (produtos ilimitados) → Prata (destaque
 ## Comandos úteis
 
 ```bash
-npm run dev         # ambiente de desenvolvimento
-npm run build        # build de produção
-npm run lint          # ESLint
-npm run db:seed      # repopula os dados de demonstração
-npm run db:reset      # reseta o banco local e roda o seed de novo
+npm run dev                # ambiente de desenvolvimento
+npm run build               # build de produção
+npm run lint                 # ESLint
+npm run db:seed             # repopula os dados de demonstração
+npm run db:reset            # reseta o banco (local) e roda o seed de novo
+npm run db:migrate:deploy   # aplica migrações pendentes (usar em produção)
 ```

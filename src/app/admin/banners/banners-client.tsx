@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { cn } from "@/lib/cn";
 import { createBanner, toggleBanner, deleteBanner } from "@/server/actions/admin";
 
@@ -27,10 +28,9 @@ export function BannersClient({ banners, cities }: { banners: Banner[]; cities: 
     <div className="space-y-4">
       <div className="rounded-2xl border border-dashed border-gray-200 p-4">
         <h3 className="mb-2 font-bold text-navy-900">Novo banner / campanha</h3>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="URL da imagem" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <select value={cityId} onChange={(e) => setCityId(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" className="h-fit rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <select value={cityId} onChange={(e) => setCityId(e.target.value)} className="h-fit rounded-lg border border-gray-200 px-3 py-2 text-sm">
             <option value="">Todas as cidades</option>
             {cities.map((c) => (
               <option key={c.id} value={c.id}>
@@ -38,6 +38,9 @@ export function BannersClient({ banners, cities }: { banners: Banner[]; cities: 
               </option>
             ))}
           </select>
+        </div>
+        <div className="mt-2">
+          <ImageUploadField label="Imagem do banner" value={imageUrl} onChange={setImageUrl} aspectClassName="aspect-[16/5]" />
         </div>
         <Button
           size="sm"

@@ -1,4 +1,5 @@
-// "Enums" em string (SQLite não suporta enum nativo no Prisma).
+// "Enums" em string, validados aqui em vez de enum nativo do Postgres — troca de
+// valor não exige migração de schema, só atualizar essas listas.
 
 export const USER_ROLES = ["CUSTOMER", "MERCHANT", "ADMIN"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
