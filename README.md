@@ -103,6 +103,7 @@ deploy. Passo a passo recomendado (Vercel, mas qualquer host Node.js serve):
    | `AUTH_SECRET` | gerar com `openssl rand -base64 32` — um valor só para produção, diferente do dev |
    | `NEXTAUTH_URL` | URL pública do app, ex: `https://boraqui.com.br` |
    | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | credenciais OAuth do Google Cloud Console, com redirect URI `{NEXTAUTH_URL}/api/auth/callback/google` |
+   | `BLOB_READ_WRITE_TOKEN` | token do [Vercel Blob](https://vercel.com/dashboard/stores) — obrigatório em produção para upload de imagens (ver item 6) |
 
 3. **Migrações**: rode `npm run db:migrate:deploy` (`prisma migrate deploy`) contra o banco de
    produção antes de servir tráfego novo — na Vercel, a forma mais simples é sobrescrever o *Build
@@ -113,14 +114,16 @@ deploy. Passo a passo recomendado (Vercel, mas qualquer host Node.js serve):
 5. **Seed**: rode `npm run db:seed` uma única vez contra o banco de produção se quiser começar com os
    dados de demonstração de Varjota/CE — normalmente você vai preferir cadastrar cidades/estabelecimentos
    reais pelo painel admin em vez de usar o seed em produção.
-6. **Imagens**: `next.config.ts` libera qualquer host `https` para `next/image` (MVP sem upload
-   próprio — comerciantes colam URLs). Se quiser travar por segurança, restrinja `images.remotePatterns`
-   ao CDN que você adotar quando implementar upload de imagem.
+6. **Imagens**: o upload (logo, capa, produtos, banners) usa [Vercel Blob](https://vercel.com/dashboard/stores)
+   quando `BLOB_READ_WRITE_TOKEN` está configurado — é o caminho de produção. Sem o token, o app grava em
+   `storage/uploads` (só funciona em servidor com filesystem persistente, não em serverless/Vercel sem o
+   token). `next.config.ts` libera qualquer host `https` para `next/image`, já que comerciantes também
+   podem colar uma URL de imagem externa em vez de fazer upload.
 
 ## Limitações conhecidas do MVP (próximos passos)
 
-- **Upload de imagens**: comerciantes colam URLs de imagem; falta um pipeline de upload
-  (S3/Cloudinary) com recorte/compressão.
+- **Upload de imagens** funciona (Vercel Blob em produção, disco local em dev), mas ainda sem
+  recorte/compressão automática — vale adicionar antes de escalar para muitos comerciantes.
 - **OTP por telefone** é simulado (`0000`); falta integração com um provedor de SMS.
 - **Pagamento** continua manual via WhatsApp (PIX copia-e-cola, dinheiro ou cartão na entrega),
   como pedido no briefing — pagamento online fica para uma fase futura.

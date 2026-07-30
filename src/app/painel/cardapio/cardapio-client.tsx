@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { CATEGORIES_SEED } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { cn } from "@/lib/cn";
 import {
   createMenuSection,
@@ -264,9 +265,9 @@ function NewProductForm({
 
   return (
     <div className="mt-3 space-y-2 rounded-xl bg-gray-50 p-3">
+      <ImageUploadField label="Foto do produto" value={imageUrl} onChange={setImageUrl} aspectClassName="aspect-[4/3]" />
       <div className="grid gap-2 sm:grid-cols-2">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do produto" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-        <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="URL da imagem" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
         <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" step="0.01" placeholder="Preço" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
         <input value={promoPrice} onChange={(e) => setPromoPrice(e.target.value)} type="number" step="0.01" placeholder="Preço promocional (opcional)" className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
         <select value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm">

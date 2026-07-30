@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { CATEGORIES_SEED } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { updateEstablishmentProfile, togglePause } from "@/server/actions/merchant";
 import { cn } from "@/lib/cn";
 
@@ -105,22 +106,18 @@ export function CompanyForm({ establishmentId, initial }: Props) {
               className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-brand-400"
             />
           </label>
-          <label className="text-sm">
-            <span className="mb-1 block font-medium text-navy-700">URL da logo</span>
-            <input
-              value={form.logoUrl}
-              onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-brand-400"
-            />
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block font-medium text-navy-700">URL da foto da fachada</span>
-            <input
-              value={form.coverUrl}
-              onChange={(e) => setForm({ ...form, coverUrl: e.target.value })}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-brand-400"
-            />
-          </label>
+          <ImageUploadField
+            label="Logo"
+            value={form.logoUrl}
+            onChange={(url) => setForm({ ...form, logoUrl: url })}
+            aspectClassName="aspect-square"
+          />
+          <ImageUploadField
+            label="Foto da fachada"
+            value={form.coverUrl}
+            onChange={(url) => setForm({ ...form, coverUrl: url })}
+            aspectClassName="aspect-video"
+          />
           <label className="text-sm">
             <span className="mb-1 block font-medium text-navy-700">Instagram</span>
             <input
