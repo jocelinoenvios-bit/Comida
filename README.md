@@ -105,15 +105,17 @@ deploy. Passo a passo recomendado (Vercel, mas qualquer host Node.js serve):
    | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | credenciais OAuth do Google Cloud Console, com redirect URI `{NEXTAUTH_URL}/api/auth/callback/google` |
    | `BLOB_READ_WRITE_TOKEN` | token do [Vercel Blob](https://vercel.com/dashboard/stores) — obrigatório em produção para upload de imagens (ver item 6) |
 
-3. **Migrações**: rode `npm run db:migrate:deploy` (`prisma migrate deploy`) contra o banco de
-   produção antes de servir tráfego novo — na Vercel, a forma mais simples é sobrescrever o *Build
-   Command* do projeto para `npm run db:migrate:deploy && next build`. Isso aplica as migrações
-   pendentes a cada deploy, sem interatividade.
+3. **Migrações e seed no deploy**: o script `vercel-build` (`prisma migrate deploy && tsx prisma/seed.ts
+   && next build`) já cobre isso — na Vercel, sobrescreva o *Build Command* do projeto para
+   `npm run vercel-build`. O seed é idempotente (usa `upsert` com IDs determinísticos), então pode
+   rodar em todo deploy sem duplicar nada; ele garante que a cidade de lançamento e os dados de
+   demonstração de Varjota/CE existam mesmo num banco novo. Depois, cadastre estabelecimentos reais
+   pelo painel admin — o seed nunca sobrescreve o que já foi editado (só cria o que ainda não existe).
 4. **`postinstall`** já roda `prisma generate` automaticamente após `npm install`, então não precisa
    de passo manual para o client ficar em sincronia com o schema.
-5. **Seed**: rode `npm run db:seed` uma única vez contra o banco de produção se quiser começar com os
-   dados de demonstração de Varjota/CE — normalmente você vai preferir cadastrar cidades/estabelecimentos
-   reais pelo painel admin em vez de usar o seed em produção.
+5. **Home e `/categoria/[slug]`** são forçadas a renderizar por request (`export const dynamic =
+   "force-dynamic"`) em vez de serem pré-geradas no build — necessário porque dependem do banco, que
+   pode estar vazio no exato momento do build antes do seed rodar.
 6. **Imagens**: o upload (logo, capa, produtos, banners) usa [Vercel Blob](https://vercel.com/dashboard/stores)
    quando `BLOB_READ_WRITE_TOKEN` está configurado — é o caminho de produção. Sem o token, o app grava em
    `storage/uploads` (só funciona em servidor com filesystem persistente, não em serverless/Vercel sem o
@@ -140,7 +142,8 @@ deploy. Passo a passo recomendado (Vercel, mas qualquer host Node.js serve):
 npm run dev                # ambiente de desenvolvimento
 npm run build               # build de produção
 npm run lint                 # ESLint
-npm run db:seed             # repopula os dados de demonstração
+npm run db:seed             # roda o seed (idempotente — seguro rodar quantas vezes quiser)
 npm run db:reset            # reseta o banco (local) e roda o seed de novo
-npm run db:migrate:deploy   # aplica migrações pendentes (usar em produção)
+npm run db:migrate:deploy   # aplica migrações pendentes
+npm run vercel-build        # migrate deploy + seed + build — usar como Build Command na Vercel
 ```
